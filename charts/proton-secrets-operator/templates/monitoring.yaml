@@ -16,8 +16,8 @@ spec:
 {{- end }}
 {{- if .Values.metrics.rules.enabled }}
 ---
-apiVersion: {{ ternary "operator.victoriametrics.com/v1beta1" "monitoring.coreos.com/v1" .Values.metrics.rules.vmRule }}
-kind: {{ ternary "VMRule" "PrometheusRule" .Values.metrics.rules.vmRule }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
 metadata:
   name: {{ include "pso.fullname" . }}
   labels: {{- include "pso.labels" . | nindent 4 }}

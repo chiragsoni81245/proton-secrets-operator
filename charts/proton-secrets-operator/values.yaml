@@ -48,8 +48,7 @@ metrics:
   serviceMonitor:
     enabled: false        # prometheus-operator
   rules:
-    enabled: false        # PrometheusRule (set vmRule for VictoriaMetrics)
-    vmRule: false
+    enabled: false        # PrometheusRule (prometheus-operator CRD)
     patExpiryDays: 14
 
 networkPolicy:
