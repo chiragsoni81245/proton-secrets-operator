@@ -1,10 +1,18 @@
 # Pinning pass-cli
 
 The image build needs, per architecture, the download URL and SHA-256 of the
-release being pinned. Both come from Proton's `versions.json` (see the
-installation page of https://protonpass.github.io/pass-cli/). They are build
-args on purpose: there is no default, so a build cannot pick an unverified
-binary.
+release being pinned. Both come from Proton's `versions.json`
+(https://proton.me/download/pass-cli/versions.json). They are build args on
+purpose: there is no default, so a build cannot pick an unverified binary.
+
+`hack/pass-cli-pin.sh` reads that file and prints everything below, ready to
+use. It only reads JSON (it does not download the binary). Review the output,
+then either set the GitHub repository variables it prints (needed by
+`release.yml`) or pass the printed `--build-arg`s to docker:
+
+```bash
+hack/pass-cli-pin.sh          # prints `gh variable set ...` lines and --build-arg flags
+```
 
 ```bash
 docker buildx build --target manager \

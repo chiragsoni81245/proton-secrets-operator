@@ -19,6 +19,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check the pass-cli pin is configured
+        env:
+          PASS_CLI_VERSION: ${{ vars.PASS_CLI_VERSION }}
+          PASS_CLI_URL_AMD64: ${{ vars.PASS_CLI_URL_AMD64 }}
+          PASS_CLI_SHA256_AMD64: ${{ vars.PASS_CLI_SHA256_AMD64 }}
+          PASS_CLI_URL_ARM64: ${{ vars.PASS_CLI_URL_ARM64 }}
+          PASS_CLI_SHA256_ARM64: ${{ vars.PASS_CLI_SHA256_ARM64 }}
+        run: |
+          missing=0
+          for v in PASS_CLI_VERSION PASS_CLI_URL_AMD64 PASS_CLI_SHA256_AMD64 PASS_CLI_URL_ARM64 PASS_CLI_SHA256_ARM64; do
+            if [ -z "${!v}" ]; then echo "::error::Repository variable $v is not set"; missing=1; fi
+          done
+          if [ "$missing" = 1 ]; then
+            echo "::error::Run hack/pass-cli-pin.sh, review the output and set the printed variables (see hack/pass-cli-versions.md)."
+            exit 1
+          fi
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: sigstore/cosign-installer@v3
