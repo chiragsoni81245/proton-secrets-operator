@@ -1,11 +1,11 @@
 proton-secrets-operator installed.
 
-Prerequisite: the PAT Secret must exist in this namespace:
-  kubectl -n {{ .Release.Namespace }} create secret generic {{ .Values.pat.existingSecret }} --from-file={{ .Values.pat.key }}=<(printf %s "$TOKEN")
+Prerequisite: the PAT Secret must exist in this namespace, with the token and (recommended) its expiry:
+  kubectl -n {{ .Release.Namespace }} create secret generic {{ .Values.pat.existingSecret }} \
+    --from-file={{ .Values.pat.key }}=<(printf %s "$TOKEN") \
+{{- if .Values.pat.expiresAtKey }}
+    --from-literal={{ .Values.pat.expiresAtKey }}=2026-12-31T23:59:59Z
+{{- end }}
 
 Create a ProtonSecret:
   kubectl explain protonsecret.spec
-{{- if not .Values.pat.expiresAt }}
-
-WARNING: pat.expiresAt is empty; the PAT-expiry alert cannot fire. PATs always expire.
-{{- end }}

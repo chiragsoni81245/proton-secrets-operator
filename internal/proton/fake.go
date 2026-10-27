@@ -3,6 +3,7 @@ package proton
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sync"
 )
 
@@ -19,9 +20,7 @@ type Fake struct {
 // NewFake returns a Fake seeded with values keyed by full pass:// reference.
 func NewFake(values map[string]string) *Fake {
 	f := &Fake{values: map[string]string{}}
-	for k, v := range values {
-		f.values[k] = v
-	}
+	maps.Copy(f.values, values)
 	return f
 }
 

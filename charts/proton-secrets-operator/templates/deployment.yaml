@@ -45,6 +45,7 @@ spec:
             - --health-probe-bind-address=:8081
             - --pat-file=/var/run/proton/token
             - --session-dir=/var/run/pass-session
+            - --proton-readiness=true
             - --key-provider={{ .Values.passCli.keyProvider }}
             - --max-concurrent-reconciles={{ .Values.controller.maxConcurrentReconciles }}
             {{- if .Values.controller.leaderElect }}
@@ -55,8 +56,8 @@ spec:
             {{- else }}
             - --pass-cli-path=/usr/local/bin/pass-cli
             {{- end }}
-            {{- with .Values.pat.expiresAt }}
-            - --pat-expiry={{ . }}
+            {{- if .Values.pat.expiresAtKey }}
+            - --pat-expiry-file=/var/run/proton/expires-at
             {{- end }}
             {{- if eq .Values.controller.logLevel "debug" }}
             - --zap-log-level=debug
@@ -93,6 +94,9 @@ spec:
             defaultMode: 0440
             items:
               - {key: {{ .Values.pat.key }}, path: token}
+              {{- if .Values.pat.expiresAtKey }}
+              - {key: {{ .Values.pat.expiresAtKey }}, path: expires-at}
+              {{- end }}
         - name: session
           emptyDir: {medium: Memory, sizeLimit: 16Mi}
         - name: tmp

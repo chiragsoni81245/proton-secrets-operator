@@ -15,9 +15,10 @@ replicaCount: 2
 pat:
   existingSecret: proton-pat
   key: token
-  # RFC3339 expiry of the PAT, exported as protonsecret_pat_expiry_timestamp_seconds
-  # and used by the PATExpiringSoon alert. PATs have a mandatory expiry: set this.
-  expiresAt: ""
+  # Optional key in the same Secret holding the PAT expiry (RFC3339, e.g. 2026-12-31T23:59:59Z).
+  # Re-read every minute, exported as protonsecret_pat_expiry_timestamp_seconds, drives the
+  # ProtonPATExpiringSoon alert. PATs always expire: set it. Empty string disables.
+  expiresAtKey: expires-at
 
 passCli:
   # Version override. Empty repository => use the pass-cli bundled in the operator image.

@@ -68,7 +68,7 @@ Run these scenarios and tick them off:
 - [ ] **Suspend**: `spec.suspend: true`; changes are ignored until unsuspended.
 - [ ] **Delete**: `deletionPolicy: Delete` removes the Secret; `Retain` keeps it (without owner reference).
 - [ ] **Leak check**: `kubectl get psec -o yaml`, `kubectl describe psec`, operator logs and events contain **no values or token**.
-- [ ] **Metrics**: `curl localhost:8443/metrics | grep protonsecret_`.
+- [ ] **Metrics**: `curl localhost:8443/metrics | grep protonsecret_`. With `--pat-expiry-file=<file with an RFC3339 time>`, `protonsecret_pat_expiry_timestamp_seconds` shows it; edit the file and it changes within a minute.
 
 ## Stage 3: packaging
 ```bash
@@ -87,7 +87,7 @@ docker run --rm --entrypoint pass-cli <image> --version        # binary runs on 
 ```bash
 kind create cluster
 kubectl create ns proton-secrets-system
-kubectl -n proton-secrets-system create secret generic proton-pat --from-literal=token="$PROTON_PASS_PERSONAL_ACCESS_TOKEN"
+kubectl -n proton-secrets-system create secret generic proton-pat --from-literal=token="$PROTON_PASS_PERSONAL_ACCESS_TOKEN" --from-literal=expires-at=2026-12-31T23:59:59Z
 kind load docker-image <image>
 helm install pso charts/proton-secrets-operator -n proton-secrets-system --set image.repository=<img> --set image.tag=<tag> --set image.pullPolicy=Never
 ```
@@ -104,7 +104,7 @@ Repeat the Stage 2 checklist, plus:
 The Argo apps `proton-secrets-operator` (wave 3) and `proton-secrets` (wave 4) are already in `k8s-homelab`. Prerequisites:
 1. Operator repo pushed to GitHub and (if private) added to Argo as a repository credential.
 2. Image published: tag a release, which runs `release.yml`. Set repo variables first (`PASS_CLI_VERSION`, `PASS_CLI_URL_AMD64`, `PASS_CLI_SHA256_AMD64` and ARM64 pair).
-3. `sudo tools/create-proton-pat-secret.sh`, then set the real `pat.expiresAt`.
+3. `sudo tools/create-proton-pat-secret.sh` (asks for the token and its expiry; both go in `proton-pat`).
 4. Create vault `homelab`, item `dummy`, field `password` in Proton Pass.
 
 Then verify: `kubectl -n argocd get app proton-secrets-operator proton-secrets` Healthy/Synced,

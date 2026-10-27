@@ -22,8 +22,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand/v2"
-	"sort"
+	"slices"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -33,7 +34,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -59,7 +62,7 @@ const (
 type ProtonSecretReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Recorder events.EventRecorder
 	Proton   proton.Client
 	// MaxConcurrent is MaxConcurrentReconciles (default 2).
 	MaxConcurrent int
@@ -70,6 +73,7 @@ type ProtonSecretReconciler struct {
 // +kubebuilder:rbac:groups=proton.chiragsoni.org,resources=protonsecrets/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments;statefulsets;daemonsets,verbs=get;patch
 
 // Reconcile makes the target Secret match the references in the ProtonSecret.
@@ -98,7 +102,7 @@ func (r *ProtonSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	refresh := refreshInterval(&ps)
 	start := time.Now()
-	res, err := r.sync(ctx, &ps)
+	err := r.sync(ctx, &ps)
 	metrics.SyncDuration.Observe(time.Since(start).Seconds())
 	metrics.ReconcileTotal.WithLabelValues(metrics.Result(err, errors.Is(err, errForeignSecret))).Inc()
 	if err == nil {
@@ -112,13 +116,13 @@ func (r *ProtonSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{RequeueAfter: min(refresh, terminalBackoff)}, nil
 	default:
 		// Transient or auth: rate-limited exponential backoff via the workqueue.
-		return res, err
+		return ctrl.Result{}, err
 	}
 }
 
 var errForeignSecret = errors.New("target Secret exists and is not managed by this ProtonSecret")
 
-func (r *ProtonSecretReconciler) sync(ctx context.Context, ps *protonv1alpha1.ProtonSecret) (ctrl.Result, error) {
+func (r *ProtonSecretReconciler) sync(ctx context.Context, ps *protonv1alpha1.ProtonSecret) error {
 	orig := ps.DeepCopy()
 	name := targetName(ps)
 	ps.Status.ObservedGeneration = ps.Generation
@@ -128,7 +132,7 @@ func (r *ProtonSecretReconciler) sync(ctx context.Context, ps *protonv1alpha1.Pr
 	if err != nil {
 		r.fail(ps, "SyncFailed", err)
 		_ = r.patchStatus(ctx, ps, orig)
-		return ctrl.Result{}, err
+		return err
 	}
 	hash := hashData(data)
 
@@ -140,14 +144,14 @@ func (r *ProtonSecretReconciler) sync(ctx context.Context, ps *protonv1alpha1.Pr
 		}
 		r.fail(ps, reason, err)
 		_ = r.patchStatus(ctx, ps, orig)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if changed {
-		r.Recorder.Eventf(ps, corev1.EventTypeNormal, "Synced", "Secret %s updated", name)
+		r.event(ps, corev1.EventTypeNormal, "Synced", "Secret %s updated", name)
 		if err := r.rollout(ctx, ps); err != nil {
 			// The Secret is already correct; surface but do not fail the sync.
-			r.Recorder.Eventf(ps, corev1.EventTypeWarning, "RolloutFailed", "%v", err)
+			r.event(ps, corev1.EventTypeWarning, "RolloutFailed", "%v", err)
 		}
 	}
 
@@ -156,7 +160,7 @@ func (r *ProtonSecretReconciler) sync(ctx context.Context, ps *protonv1alpha1.Pr
 	ps.Status.LastSyncHash = hash
 	setCond(ps, protonv1alpha1.ConditionSynced, metav1.ConditionTrue, "Synced", "Proton Pass read succeeded")
 	setCond(ps, protonv1alpha1.ConditionReady, metav1.ConditionTrue, "SecretUpToDate", "Secret matches Proton Pass")
-	return ctrl.Result{}, r.patchStatus(ctx, ps, orig)
+	return r.patchStatus(ctx, ps, orig)
 }
 
 // resolve reads every reference once; identical references are fetched once.
@@ -206,30 +210,29 @@ func (r *ProtonSecretReconciler) apply(ctx context.Context, ps *protonv1alpha1.P
 	}
 
 	labels := map[string]string{protonv1alpha1.ManagedByLabel: protonv1alpha1.ManagedByValue}
-	for k, v := range ps.Spec.Target.Labels {
-		labels[k] = v
-	}
+	maps.Copy(labels, ps.Spec.Target.Labels)
 	annotations := map[string]string{protonv1alpha1.HashAnnotation: hash}
-	for k, v := range ps.Spec.Target.Annotations {
-		annotations[k] = v
-	}
+	maps.Copy(annotations, ps.Spec.Target.Annotations)
 	secretType := ps.Spec.Target.Type
 	if secretType == "" {
 		secretType = corev1.SecretTypeOpaque
 	}
 
-	desired := &corev1.Secret{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ps.Namespace, Labels: labels, Annotations: annotations},
-		Type:       secretType,
-		Data:       data,
-	}
+	desired := corev1ac.Secret(name, ps.Namespace).
+		WithLabels(labels).
+		WithAnnotations(annotations).
+		WithType(secretType).
+		WithData(data)
 	if policy != protonv1alpha1.CreationPolicyMerge {
-		if err := controllerutil.SetControllerReference(ps, desired, r.Scheme); err != nil {
-			return false, err
-		}
+		desired = desired.WithOwnerReferences(metav1ac.OwnerReference().
+			WithAPIVersion(protonv1alpha1.GroupVersion.String()).
+			WithKind("ProtonSecret").
+			WithName(ps.Name).
+			WithUID(ps.UID).
+			WithController(true).
+			WithBlockOwnerDeletion(true))
 	}
-	if err := r.Patch(ctx, desired, client.Apply, client.FieldOwner(fieldOwner), client.ForceOwnership); err != nil {
+	if err := r.Apply(ctx, desired, client.FieldOwner(fieldOwner), client.ForceOwnership); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -310,11 +313,16 @@ func (r *ProtonSecretReconciler) finalize(ctx context.Context, ps *protonv1alpha
 	return r.Update(ctx, ps)
 }
 
+// event records an Event on the ProtonSecret (events.k8s.io API). Messages never contain values.
+func (r *ProtonSecretReconciler) event(ps *protonv1alpha1.ProtonSecret, typ, reason, format string, args ...any) {
+	r.Recorder.Eventf(ps, nil, typ, reason, "Sync", format, args...)
+}
+
 func (r *ProtonSecretReconciler) fail(ps *protonv1alpha1.ProtonSecret, reason string, err error) {
 	// Errors from the proton package never contain secret values or tokens.
 	setCond(ps, protonv1alpha1.ConditionSynced, metav1.ConditionFalse, reason, err.Error())
 	setCond(ps, protonv1alpha1.ConditionReady, metav1.ConditionFalse, reason, err.Error())
-	r.Recorder.Eventf(ps, corev1.EventTypeWarning, reason, "%v", err)
+	r.event(ps, corev1.EventTypeWarning, reason, "%v", err)
 }
 
 func (r *ProtonSecretReconciler) patchStatus(ctx context.Context, ps, orig *protonv1alpha1.ProtonSecret) error {
@@ -349,14 +357,9 @@ func jitter(d time.Duration) time.Duration {
 
 // hashData is a SHA-256 over sorted key/value pairs.
 func hashData(data map[string][]byte) string {
-	keys := make([]string, 0, len(data))
-	for k := range data {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
 	h := sha256.New()
-	for _, k := range keys {
-		fmt.Fprintf(h, "%d:%s=%d:", len(k), k, len(data[k]))
+	for _, k := range slices.Sorted(maps.Keys(data)) {
+		_, _ = fmt.Fprintf(h, "%d:%s=%d:", len(k), k, len(data[k]))
 		h.Write(data[k])
 	}
 	return hex.EncodeToString(h.Sum(nil))

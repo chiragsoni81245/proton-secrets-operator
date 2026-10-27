@@ -16,6 +16,7 @@ const (
 	// PAT sessions last 2h; refresh well before that.
 	sessionMaxAge  = 100 * time.Minute
 	defaultTimeout = 30 * time.Second
+	healthCacheTTL = 30 * time.Second
 )
 
 // CLIConfig configures the pass-cli backed client.
@@ -42,6 +43,10 @@ type CLI struct {
 
 	mu       sync.Mutex
 	loggedAt time.Time
+
+	healthMu  sync.Mutex
+	healthAt  time.Time
+	healthErr error
 }
 
 // NewCLI validates cfg and returns a client. It does not log in yet.
@@ -87,11 +92,18 @@ func (c *CLI) Resolve(ctx context.Context, ref string) (string, error) {
 }
 
 // Healthy verifies the session with `pass-cli info`.
+// The result is cached briefly so frequent probes do not spawn pass-cli each time.
 func (c *CLI) Healthy(ctx context.Context) error {
-	if err := c.ensureSession(ctx, false); err != nil {
-		return err
+	c.healthMu.Lock()
+	defer c.healthMu.Unlock()
+	if !c.healthAt.IsZero() && time.Since(c.healthAt) < healthCacheTTL {
+		return c.healthErr
 	}
-	_, err := c.run(ctx, nil, "info")
+	err := c.ensureSession(ctx, false)
+	if err == nil {
+		_, err = c.run(ctx, nil, "info")
+	}
+	c.healthAt, c.healthErr = time.Now(), err
 	return err
 }
 

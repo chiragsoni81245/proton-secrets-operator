@@ -45,7 +45,18 @@ RUN apt-get update \
 COPY --from=pass-cli /usr/local/bin/pass-cli /usr/local/bin/pass-cli
 USER 65532:65532
 
-# --- operator (default target) -------------------------------------------------
+# --- operator without pass-cli (dev / e2e) ----------------------------------------
+# Used by `make docker-build` (and therefore the kind e2e), which never talks to Proton.
+FROM debian:bookworm-slim AS manager-dev
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /
+COPY --from=builder /workspace/manager /manager
+USER 65532:65532
+ENTRYPOINT ["/manager"]
+
+# --- operator (release target; last stage = default for plain `docker build`) -----
 # pass-cli is probably dynamically linked, so a glibc base is used rather than distroless/static.
 FROM debian:bookworm-slim AS manager
 RUN apt-get update \

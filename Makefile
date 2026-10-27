@@ -69,6 +69,8 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 # - KUBECTL_KUBERC=true
 # CertManager is installed by default; skip with:
 # - CERT_MANAGER_INSTALL_SKIP=true
+# Image stage for local/e2e builds: manager-dev has no pass-cli. Releases use `manager` (see release.yml).
+DOCKER_TARGET ?= manager-dev
 KIND_CLUSTER ?= proton-secrets-operator-test-e2e
 
 .PHONY: setup-test-e2e
@@ -122,8 +124,8 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # Override BASE_IMAGE to build from another registry, e.g.
 # make docker-build IMG=<img> BASE_IMAGE=docker.io/library/golang:1.26
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build $(if $(BASE_IMAGE),--build-arg BASE_IMAGE=$(BASE_IMAGE)) -t ${IMG} .
+docker-build: ## Build the manager image. DOCKER_TARGET=manager needs the PASS_CLI_* build args (see hack/pass-cli-versions.md).
+	$(CONTAINER_TOOL) build --target $(DOCKER_TARGET) $(if $(BASE_IMAGE),--build-arg BASE_IMAGE=$(BASE_IMAGE)) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.

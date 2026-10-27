@@ -74,7 +74,8 @@ func main() {
 	var tlsOpts []func(*tls.Config)
 	var passCliPath, tokenFile, sessionDir, keyProvider string
 	var maxConcurrent int
-	var patExpiry string
+	var protonReadiness bool
+	var patExpiryFile string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -84,10 +85,15 @@ func main() {
 	flag.BoolVar(&secureMetrics, "metrics-secure", true,
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.StringVar(&passCliPath, "pass-cli-path", "pass-cli", "Path to the pass-cli binary.")
-	flag.StringVar(&tokenFile, "pat-file", "/var/run/proton/token", "File containing the Proton Pass personal access token.")
-	flag.StringVar(&sessionDir, "session-dir", "/tmp/pass-session", "Writable directory for the pass-cli session (use an emptyDir).")
+	flag.StringVar(&tokenFile, "pat-file", "/var/run/proton/token",
+		"File containing the Proton Pass personal access token.")
+	flag.StringVar(&sessionDir, "session-dir", "/tmp/pass-session",
+		"Writable directory for the pass-cli session (use an emptyDir).")
 	flag.StringVar(&keyProvider, "key-provider", "fs", "pass-cli key provider: fs, env or keyring.")
-	flag.StringVar(&patExpiry, "pat-expiry", "", "RFC3339 expiry of the PAT, exported as a metric for alerting (optional).")
+	flag.StringVar(&patExpiryFile, "pat-expiry-file", "",
+		"Optional file holding the PAT expiry (RFC3339), re-read every minute and exported as a metric for alerting.")
+	flag.BoolVar(&protonReadiness, "proton-readiness", false,
+		"Make /readyz require a working Proton Pass session (the chart enables this).")
 	flag.IntVar(&maxConcurrent, "max-concurrent-reconciles", 2, "Concurrent reconciles and pass-cli processes.")
 	flag.StringVar(&webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
 	flag.StringVar(&webhookCertName, "webhook-cert-name", "tls.crt", "The name of the webhook certificate file.")
@@ -207,14 +213,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if patExpiry != "" {
-		t, perr := time.Parse(time.RFC3339, patExpiry)
-		if perr != nil {
-			setupLog.Error(perr, "Invalid --pat-expiry, want RFC3339")
-			os.Exit(1)
-		}
-		metrics.SetPATExpiry(t)
-	}
 	metrics.PassCLIInfo.WithLabelValues(proton.CLIVersion(context.Background(), passCliPath)).Set(1)
 
 	pc, err := proton.NewCLI(proton.CLIConfig{
@@ -229,12 +227,18 @@ func main() {
 	if err := (&controller.ProtonSecretReconciler{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
-		Recorder:      mgr.GetEventRecorderFor("proton-secrets-operator"),
+		Recorder:      mgr.GetEventRecorder("proton-secrets-operator"),
 		Proton:        pc,
 		MaxConcurrent: maxConcurrent,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "protonsecret")
 		os.Exit(1)
+	}
+	if patExpiryFile != "" {
+		if err := mgr.Add(metrics.WatchPATExpiry(patExpiryFile, time.Minute)); err != nil {
+			setupLog.Error(err, "Failed to add PAT expiry watcher")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 
@@ -242,12 +246,14 @@ func main() {
 		setupLog.Error(err, "Failed to set up health check")
 		os.Exit(1)
 	}
-	// Readiness reflects a usable Proton session so a bad/expired PAT is visible.
-	if err := mgr.AddReadyzCheck("proton", func(r *http.Request) error {
-		return pc.Healthy(r.Context())
-	}); err != nil {
-		setupLog.Error(err, "Failed to set up Proton ready check")
-		os.Exit(1)
+	// Readiness can reflect a usable Proton session so a bad/expired PAT is visible.
+	if protonReadiness {
+		if err := mgr.AddReadyzCheck("proton", func(r *http.Request) error {
+			return pc.Healthy(r.Context())
+		}); err != nil {
+			setupLog.Error(err, "Failed to set up Proton ready check")
+			os.Exit(1)
+		}
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "Failed to set up ready check")
