@@ -1,0 +1,60 @@
+{{- if and .Values.metrics.enabled .Values.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "pso.fullname" . }}
+  labels: {{- include "pso.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels: {{- include "pso.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: metrics
+      scheme: https
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      tlsConfig: {insecureSkipVerify: true}
+{{- end }}
+{{- if and .Values.metrics.enabled .Values.metrics.vmServiceScrape.enabled }}
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: {{ include "pso.fullname" . }}
+  labels: {{- include "pso.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels: {{- include "pso.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: metrics
+      scheme: https
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      tlsConfig: {insecureSkipVerify: true}
+{{- end }}
+{{- if .Values.metrics.rules.enabled }}
+---
+apiVersion: {{ ternary "operator.victoriametrics.com/v1beta1" "monitoring.coreos.com/v1" .Values.metrics.rules.vmRule }}
+kind: {{ ternary "VMRule" "PrometheusRule" .Values.metrics.rules.vmRule }}
+metadata:
+  name: {{ include "pso.fullname" . }}
+  labels: {{- include "pso.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: proton-secrets-operator
+      rules:
+        - alert: ProtonSecretSyncFailing
+          expr: increase(protonsecret_reconcile_total{result!="success"}[15m]) > 0 and on() (increase(protonsecret_reconcile_total{result="success"}[15m]) == 0)
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: ProtonSecrets are failing to sync with Proton Pass
+        - alert: ProtonSecretStale
+          expr: time() - protonsecret_last_sync_timestamp_seconds > 6 * 3600
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: {{ `ProtonSecret {{ $labels.namespace }}/{{ $labels.name }} has not synced for 6h` | quote }}
+        - alert: ProtonPATExpiringSoon
+          expr: protonsecret_pat_expiry_timestamp_seconds > 0 and protonsecret_pat_expiry_timestamp_seconds - time() < {{ mul .Values.metrics.rules.patExpiryDays 86400 }}
+          labels: {severity: critical}
+          annotations:
+            summary: The Proton Pass personal access token expires soon; rotate it
+{{- end }}

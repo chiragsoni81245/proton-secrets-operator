@@ -1,0 +1,18 @@
+name: Chart
+on:
+  push: {paths: ['charts/**', 'config/crd/**', 'api/**']}
+  pull_request: {paths: ['charts/**', 'config/crd/**', 'api/**']}
+permissions: {contents: read}
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - uses: actions/setup-go@v5
+        with: {go-version-file: go.mod}
+      - name: Chart CRD is in sync with API types
+        run: |
+          make chart-crd
+          git diff --exit-code charts/proton-secrets-operator/templates/crd.yaml
+      - run: make chart-lint

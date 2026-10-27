@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["pat"],
+  "properties": {
+    "replicaCount": {"type": "integer", "minimum": 1},
+    "pat": {
+      "type": "object",
+      "required": ["existingSecret", "key"],
+      "properties": {
+        "existingSecret": {"type": "string", "minLength": 1},
+        "key": {"type": "string", "minLength": 1},
+        "expiresAt": {"type": "string"}
+      }
+    },
+    "passCli": {
+      "type": "object",
+      "properties": {"keyProvider": {"type": "string", "enum": ["fs", "env", "keyring"]}}
+    },
+    "controller": {
+      "type": "object",
+      "properties": {
+        "maxConcurrentReconciles": {"type": "integer", "minimum": 1},
+        "logLevel": {"type": "string", "enum": ["info", "debug"]}
+      }
+    }
+  }
+}

@@ -1,0 +1,67 @@
+name: Release
+# Tag vX.Y.Z -> multi-arch image, pass-cli image, OCI Helm chart, all signed with cosign (keyless).
+# pass-cli pin comes from repository variables (see hack/pass-cli-versions.md):
+#   PASS_CLI_VERSION, PASS_CLI_URL_AMD64, PASS_CLI_SHA256_AMD64, PASS_CLI_URL_ARM64, PASS_CLI_SHA256_ARM64
+on:
+  push: {tags: ['v*']}
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/${{ github.repository }}
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: sigstore/cosign-installer@v3
+      - uses: azure/setup-helm@v4
+      - uses: docker/login-action@v3
+        with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}'}
+      - name: Operator image
+        id: manager
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: manager
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ${{ env.IMAGE }}:${{ github.ref_name }}
+          build-args: |
+            PASS_CLI_VERSION=${{ vars.PASS_CLI_VERSION }}
+            PASS_CLI_URL_AMD64=${{ vars.PASS_CLI_URL_AMD64 }}
+            PASS_CLI_SHA256_AMD64=${{ vars.PASS_CLI_SHA256_AMD64 }}
+            PASS_CLI_URL_ARM64=${{ vars.PASS_CLI_URL_ARM64 }}
+            PASS_CLI_SHA256_ARM64=${{ vars.PASS_CLI_SHA256_ARM64 }}
+      - name: pass-cli image
+        id: passcli
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: pass-cli-image
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ghcr.io/${{ github.repository_owner }}/pass-cli:${{ vars.PASS_CLI_VERSION }}
+          build-args: |
+            PASS_CLI_VERSION=${{ vars.PASS_CLI_VERSION }}
+            PASS_CLI_URL_AMD64=${{ vars.PASS_CLI_URL_AMD64 }}
+            PASS_CLI_SHA256_AMD64=${{ vars.PASS_CLI_SHA256_AMD64 }}
+            PASS_CLI_URL_ARM64=${{ vars.PASS_CLI_URL_ARM64 }}
+            PASS_CLI_SHA256_ARM64=${{ vars.PASS_CLI_SHA256_ARM64 }}
+      - name: Sign images
+        run: |
+          cosign sign --yes ${{ env.IMAGE }}@${{ steps.manager.outputs.digest }}
+          cosign sign --yes ghcr.io/${{ github.repository_owner }}/pass-cli@${{ steps.passcli.outputs.digest }}
+      - name: Package and push chart
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          helm package charts/proton-secrets-operator --version "$v" --app-version "$v"
+          helm push proton-secrets-operator-"$v".tgz oci://ghcr.io/${{ github.repository_owner }}/charts

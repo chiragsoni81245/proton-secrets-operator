@@ -1,0 +1,90 @@
+# Unofficial community project; not affiliated with Proton AG.
+
+image:
+  repository: ghcr.io/chiragsoni81245/proton-secrets-operator
+  # Defaults to .Chart.AppVersion
+  tag: ""
+  # Pin by digest in production (takes precedence over tag)
+  digest: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+replicaCount: 2
+
+# Personal access token. Create the Secret yourself; the chart never takes the token as a value.
+pat:
+  existingSecret: proton-pat
+  key: token
+  # RFC3339 expiry of the PAT, exported as protonsecret_pat_expiry_timestamp_seconds
+  # and used by the PATExpiringSoon alert. PATs have a mandatory expiry: set this.
+  expiresAt: ""
+
+passCli:
+  # Version override. Empty repository => use the pass-cli bundled in the operator image.
+  # When set, an initContainer copies /usr/local/bin/pass-cli from this image into a
+  # shared volume and the operator uses it (change the CLI without rebuilding the operator).
+  image:
+    repository: ""
+    tag: ""
+    digest: ""
+  # fs works in containers (kernel keyring is not reachable); the key lives on a memory-backed emptyDir.
+  keyProvider: fs
+
+controller:
+  maxConcurrentReconciles: 2
+  leaderElect: true
+  logLevel: info          # info | debug
+  extraArgs: []
+
+crds:
+  # Install/upgrade the CRD with the chart. Helm never upgrades files in crds/, so it is a template.
+  install: true
+  keep: true              # keep CRD (and all ProtonSecrets) on uninstall
+
+metrics:
+  enabled: true
+  port: 8443              # HTTPS with authn/authz
+  serviceMonitor:
+    enabled: false        # prometheus-operator
+  vmServiceScrape:
+    enabled: false        # VictoriaMetrics operator
+  rules:
+    enabled: false        # PrometheusRule (set vmRule for VictoriaMetrics)
+    vmRule: false
+    patExpiryDays: 14
+
+networkPolicy:
+  enabled: false
+  # Egress to HTTPS (Proton + API server on 443) and the API server port.
+  apiServerPorts: [443, 6443]
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {memory: 256Mi}
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []   # default: spread by host when replicaCount > 1
+priorityClassName: ""
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  seccompProfile: {type: RuntimeDefault}
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: {drop: [ALL]}

@@ -1,0 +1,122 @@
+{{- $override := ne .Values.passCli.image.repository "" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pso.fullname" . }}
+  labels: {{- include "pso.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels: {{- include "pso.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pso.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}{{ toYaml . | nindent 8 }}{{ end }}
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+        {{- with .Values.podAnnotations }}{{ toYaml . | nindent 8 }}{{ end }}
+    spec:
+      serviceAccountName: {{ include "pso.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      securityContext: {{- toYaml .Values.securityContext | nindent 8 }}
+      terminationGracePeriodSeconds: 30
+      {{- if $override }}
+      initContainers:
+        - name: pass-cli
+          image: {{ include "pso.passCliImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [cp, /usr/local/bin/pass-cli, /shared/pass-cli]
+          securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - {name: pass-cli, mountPath: /shared}
+      {{- end }}
+      containers:
+        - name: manager
+          image: {{ include "pso.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --metrics-bind-address={{ if .Values.metrics.enabled }}:{{ .Values.metrics.port }}{{ else }}0{{ end }}
+            - --health-probe-bind-address=:8081
+            - --pat-file=/var/run/proton/token
+            - --session-dir=/var/run/pass-session
+            - --key-provider={{ .Values.passCli.keyProvider }}
+            - --max-concurrent-reconciles={{ .Values.controller.maxConcurrentReconciles }}
+            {{- if .Values.controller.leaderElect }}
+            - --leader-elect
+            {{- end }}
+            {{- if $override }}
+            - --pass-cli-path=/shared/pass-cli
+            {{- else }}
+            - --pass-cli-path=/usr/local/bin/pass-cli
+            {{- end }}
+            {{- with .Values.pat.expiresAt }}
+            - --pat-expiry={{ . }}
+            {{- end }}
+            {{- if eq .Values.controller.logLevel "debug" }}
+            - --zap-log-level=debug
+            {{- end }}
+            - --zap-encoder=json
+            {{- range .Values.controller.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          ports:
+            - {name: metrics, containerPort: {{ .Values.metrics.port }}}
+            - {name: probes, containerPort: 8081}
+          livenessProbe:
+            httpGet: {path: /healthz, port: probes}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: {path: /readyz, port: probes}
+            initialDelaySeconds: 5
+            periodSeconds: 20
+            timeoutSeconds: 35   # readiness may perform a pass-cli call
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - {name: pat, mountPath: /var/run/proton, readOnly: true}
+            - {name: session, mountPath: /var/run/pass-session}
+            - {name: tmp, mountPath: /tmp}
+            {{- if $override }}
+            - {name: pass-cli, mountPath: /shared, readOnly: true}
+            {{- end }}
+      volumes:
+        - name: pat
+          secret:
+            secretName: {{ .Values.pat.existingSecret }}
+            defaultMode: 0440
+            items:
+              - {key: {{ .Values.pat.key }}, path: token}
+        - name: session
+          emptyDir: {medium: Memory, sizeLimit: 16Mi}
+        - name: tmp
+          emptyDir: {sizeLimit: 16Mi}
+        {{- if $override }}
+        - name: pass-cli
+          emptyDir: {sizeLimit: 128Mi}
+        {{- end }}
+      {{- if .Values.topologySpreadConstraints }}
+      topologySpreadConstraints: {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
+      {{- else if gt (int .Values.replicaCount) 1 }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {{- include "pso.selectorLabels" . | nindent 14 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
