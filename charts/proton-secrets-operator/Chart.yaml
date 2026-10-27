@@ -5,4 +5,8 @@ type: application
 version: 0.1.0
 appVersion: "0.1.0"
 kubeVersion: ">=1.29.0-0"
-keywords: [secrets, proton, proton-pass, operator]
+keywords:
+  - secrets
+  - proton
+  - proton-pass
+  - operator

@@ -31,10 +31,14 @@ spec:
         - name: pass-cli
           image: {{ include "pso.passCliImage" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: [cp, /usr/local/bin/pass-cli, /shared/pass-cli]
+          command:
+            - cp
+            - /usr/local/bin/pass-cli
+            - /shared/pass-cli
           securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           volumeMounts:
-            - {name: pass-cli, mountPath: /shared}
+            - name: pass-cli
+              mountPath: /shared
       {{- end }}
       containers:
         - name: manager
@@ -67,25 +71,37 @@ spec:
             - {{ . | quote }}
             {{- end }}
           ports:
-            - {name: metrics, containerPort: {{ .Values.metrics.port }}}
-            - {name: probes, containerPort: 8081}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+            - name: probes
+              containerPort: 8081
           livenessProbe:
-            httpGet: {path: /healthz, port: probes}
+            httpGet:
+              path: /healthz
+              port: probes
             initialDelaySeconds: 15
             periodSeconds: 20
           readinessProbe:
-            httpGet: {path: /readyz, port: probes}
+            httpGet:
+              path: /readyz
+              port: probes
             initialDelaySeconds: 5
             periodSeconds: 20
             timeoutSeconds: 35   # readiness may perform a pass-cli call
           resources: {{- toYaml .Values.resources | nindent 12 }}
           securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           volumeMounts:
-            - {name: pat, mountPath: /var/run/proton, readOnly: true}
-            - {name: session, mountPath: /var/run/pass-session}
-            - {name: tmp, mountPath: /tmp}
+            - name: pat
+              mountPath: /var/run/proton
+              readOnly: true
+            - name: session
+              mountPath: /var/run/pass-session
+            - name: tmp
+              mountPath: /tmp
             {{- if $override }}
-            - {name: pass-cli, mountPath: /shared, readOnly: true}
+            - name: pass-cli
+              mountPath: /shared
+              readOnly: true
             {{- end }}
       volumes:
         - name: pat
@@ -93,17 +109,23 @@ spec:
             secretName: {{ .Values.pat.existingSecret }}
             defaultMode: 0440
             items:
-              - {key: {{ .Values.pat.key }}, path: token}
+              - key: {{ .Values.pat.key }}
+                path: token
               {{- if .Values.pat.expiresAtKey }}
-              - {key: {{ .Values.pat.expiresAtKey }}, path: expires-at}
+              - key: {{ .Values.pat.expiresAtKey }}
+                path: expires-at
               {{- end }}
         - name: session
-          emptyDir: {medium: Memory, sizeLimit: 16Mi}
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
         - name: tmp
-          emptyDir: {sizeLimit: 16Mi}
+          emptyDir:
+            sizeLimit: 16Mi
         {{- if $override }}
         - name: pass-cli
-          emptyDir: {sizeLimit: 128Mi}
+          emptyDir:
+            sizeLimit: 128Mi
         {{- end }}
       {{- if .Values.topologySpreadConstraints }}
       topologySpreadConstraints: {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}

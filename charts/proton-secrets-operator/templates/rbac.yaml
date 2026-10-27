@@ -4,43 +4,92 @@ metadata:
   name: {{ include "pso.fullname" . }}
   labels: {{- include "pso.labels" . | nindent 4 }}
 rules:
-  - apiGroups: [""]
-    resources: [secrets]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [""]
-    resources: [events]
-    verbs: [create, patch]
-  - apiGroups: [events.k8s.io]
-    resources: [events]
-    verbs: [create, patch]
-  - apiGroups: [apps]
-    resources: [deployments, statefulsets, daemonsets]
-    verbs: [get, patch]
-  - apiGroups: [proton.chiragsoni.org]
-    resources: [protonsecrets]
-    verbs: [get, list, watch, update, patch]
-  - apiGroups: [proton.chiragsoni.org]
-    resources: [protonsecrets/status]
-    verbs: [get, update, patch]
-  - apiGroups: [proton.chiragsoni.org]
-    resources: [protonsecrets/finalizers]
-    verbs: [update]
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+      - statefulsets
+      - daemonsets
+    verbs:
+      - get
+      - patch
+  - apiGroups:
+      - proton.chiragsoni.org
+    resources:
+      - protonsecrets
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - proton.chiragsoni.org
+    resources:
+      - protonsecrets/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - proton.chiragsoni.org
+    resources:
+      - protonsecrets/finalizers
+    verbs:
+      - update
   # secure metrics endpoint (authn/authz filter)
-  - apiGroups: [authentication.k8s.io]
-    resources: [tokenreviews]
-    verbs: [create]
-  - apiGroups: [authorization.k8s.io]
-    resources: [subjectaccessreviews]
-    verbs: [create]
+  - apiGroups:
+      - authentication.k8s.io
+    resources:
+      - tokenreviews
+    verbs:
+      - create
+  - apiGroups:
+      - authorization.k8s.io
+    resources:
+      - subjectaccessreviews
+    verbs:
+      - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: {{ include "pso.fullname" . }}
   labels: {{- include "pso.labels" . | nindent 4 }}
-roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: {{ include "pso.fullname" . }}}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "pso.fullname" . }}
 subjects:
-  - {kind: ServiceAccount, name: {{ include "pso.serviceAccountName" . }}, namespace: {{ .Release.Namespace }}}
+  - kind: ServiceAccount
+    name: {{ include "pso.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -48,21 +97,43 @@ metadata:
   name: {{ include "pso.fullname" . }}-leader-election
   labels: {{- include "pso.labels" . | nindent 4 }}
 rules:
-  - apiGroups: [coordination.k8s.io]
-    resources: [leases]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [""]
-    resources: [events]
-    verbs: [create, patch]
-  - apiGroups: [events.k8s.io]
-    resources: [events]
-    verbs: [create, patch]
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ include "pso.fullname" . }}-leader-election
   labels: {{- include "pso.labels" . | nindent 4 }}
-roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ include "pso.fullname" . }}-leader-election}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "pso.fullname" . }}-leader-election
 subjects:
-  - {kind: ServiceAccount, name: {{ include "pso.serviceAccountName" . }}, namespace: {{ .Release.Namespace }}}
+  - kind: ServiceAccount
+    name: {{ include "pso.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}

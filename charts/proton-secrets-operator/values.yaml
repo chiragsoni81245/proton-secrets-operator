@@ -7,7 +7,7 @@ image:
   # Pin by digest in production (takes precedence over tag)
   digest: ""
   pullPolicy: IfNotPresent
-imagePullSecrets: []
+imagePullSecrets:
 
 replicaCount: 2
 
@@ -35,7 +35,7 @@ controller:
   maxConcurrentReconciles: 2
   leaderElect: true
   logLevel: info          # info | debug
-  extraArgs: []
+  extraArgs:
 
 crds:
   # Install/upgrade the CRD with the chart. Helm never upgrades files in crds/, so it is a template.
@@ -57,35 +57,43 @@ metrics:
 networkPolicy:
   enabled: false
   # Egress to HTTPS (Proton + API server on 443) and the API server port.
-  apiServerPorts: [443, 6443]
+  apiServerPorts:
+    - 443
+    - 6443
 
 podDisruptionBudget:
   enabled: true
   minAvailable: 1
 
 resources:
-  requests: {cpu: 50m, memory: 64Mi}
-  limits: {memory: 256Mi}
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
 
 serviceAccount:
   create: true
   name: ""
-  annotations: {}
+  annotations:
 
-podAnnotations: {}
-podLabels: {}
-nodeSelector: {}
-tolerations: []
-affinity: {}
-topologySpreadConstraints: []   # default: spread by host when replicaCount > 1
+podAnnotations:
+podLabels:
+nodeSelector:
+tolerations:
+affinity:
+topologySpreadConstraints:   # default: spread by host when replicaCount > 1
 priorityClassName: ""
 
 securityContext:
   runAsNonRoot: true
   runAsUser: 65532
   runAsGroup: 65532
-  seccompProfile: {type: RuntimeDefault}
+  seccompProfile:
+    type: RuntimeDefault
 containerSecurityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
-  capabilities: {drop: [ALL]}
+  capabilities:
+    drop:
+      - ALL

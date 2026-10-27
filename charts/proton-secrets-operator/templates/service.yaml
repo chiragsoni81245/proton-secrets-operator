@@ -7,5 +7,7 @@ metadata:
 spec:
   selector: {{- include "pso.selectorLabels" . | nindent 4 }}
   ports:
-    - {name: metrics, port: {{ .Values.metrics.port }}, targetPort: metrics}
+    - name: metrics
+      port: {{ .Values.metrics.port }}
+      targetPort: metrics
 {{- end }}

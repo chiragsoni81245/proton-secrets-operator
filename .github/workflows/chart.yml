@@ -1,8 +1,17 @@
 name: Chart
 on:
-  push: {paths: ['charts/**', 'config/crd/**', 'api/**']}
-  pull_request: {paths: ['charts/**', 'config/crd/**', 'api/**']}
-permissions: {contents: read}
+  push:
+    paths:
+      - 'charts/**'
+      - 'config/crd/**'
+      - 'api/**'
+  pull_request:
+    paths:
+      - 'charts/**'
+      - 'config/crd/**'
+      - 'api/**'
+permissions:
+  contents: read
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -10,7 +19,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
       - uses: actions/setup-go@v5
-        with: {go-version-file: go.mod}
+        with:
+          go-version-file: go.mod
       - name: Chart CRD is in sync with API types
         run: |
           make chart-crd

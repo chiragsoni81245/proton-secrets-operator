@@ -9,13 +9,19 @@ A Kubernetes operator that syncs secrets from [Proton Pass](https://proton.me/pa
 ```yaml
 apiVersion: proton.chiragsoni.org/v1alpha1
 kind: ProtonSecret
-metadata: {name: grafana-admin, namespace: monitoring}
+metadata:
+  name: grafana-admin
+  namespace: monitoring
 spec:
   refreshInterval: 1h
   data:
-    - {secretKey: admin-user,     remoteRef: pass://homelab/grafana/username}
-    - {secretKey: admin-password, remoteRef: pass://homelab/grafana/password}
-  rolloutTargets: [{kind: Deployment, name: grafana}]
+    - secretKey: admin-user
+      remoteRef: pass://homelab/grafana/username
+    - secretKey: admin-password
+      remoteRef: pass://homelab/grafana/password
+  rolloutTargets:
+    - kind: Deployment
+      name: grafana
 ```
 
 ## How it works

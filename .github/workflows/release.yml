@@ -3,7 +3,9 @@ name: Release
 # pass-cli pin comes from repository variables (see hack/pass-cli-versions.md):
 #   PASS_CLI_VERSION, PASS_CLI_URL_AMD64, PASS_CLI_SHA256_AMD64, PASS_CLI_URL_ARM64, PASS_CLI_SHA256_ARM64
 on:
-  push: {tags: ['v*']}
+  push:
+    tags:
+      - 'v*'
 permissions:
   contents: read
   packages: write
@@ -21,7 +23,10 @@ jobs:
       - uses: sigstore/cosign-installer@v3
       - uses: azure/setup-helm@v4
       - uses: docker/login-action@v3
-        with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}'}
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Operator image
         id: manager
         uses: docker/build-push-action@v6
