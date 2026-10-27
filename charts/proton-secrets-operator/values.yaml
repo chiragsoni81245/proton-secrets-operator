@@ -47,8 +47,6 @@ metrics:
   port: 8443              # HTTPS with authn/authz
   serviceMonitor:
     enabled: false        # prometheus-operator
-  vmServiceScrape:
-    enabled: false        # VictoriaMetrics operator
   rules:
     enabled: false        # PrometheusRule (set vmRule for VictoriaMetrics)
     vmRule: false

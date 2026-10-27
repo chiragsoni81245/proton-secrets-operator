@@ -108,7 +108,7 @@ The Argo apps `proton-secrets-operator` (wave 3) and `proton-secrets` (wave 4) a
 4. Create vault `homelab`, item `dummy`, field `password` in Proton Pass.
 
 Then verify: `kubectl -n argocd get app proton-secrets-operator proton-secrets` Healthy/Synced,
-`kubectl -n proton-secrets-system get protonsecret,secret example`, the VMServiceScrape target is up, and the
+`kubectl -n proton-secrets-system get protonsecret,secret example`, the metrics Service answers (scraping is configured on the homelab side), and the
 `ProtonPAT*` rules are loaded in vmalert. Only after that migrate real secrets one at a time (Grafana first, with `rolloutTargets`).
 
 ## When something fails

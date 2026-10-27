@@ -14,23 +14,6 @@ spec:
       tlsConfig:
         insecureSkipVerify: true
 {{- end }}
-{{- if and .Values.metrics.enabled .Values.metrics.vmServiceScrape.enabled }}
----
-apiVersion: operator.victoriametrics.com/v1beta1
-kind: VMServiceScrape
-metadata:
-  name: {{ include "pso.fullname" . }}
-  labels: {{- include "pso.labels" . | nindent 4 }}
-spec:
-  selector:
-    matchLabels: {{- include "pso.selectorLabels" . | nindent 6 }}
-  endpoints:
-    - port: metrics
-      scheme: https
-      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-      tlsConfig:
-        insecureSkipVerify: true
-{{- end }}
 {{- if .Values.metrics.rules.enabled }}
 ---
 apiVersion: {{ ternary "operator.victoriametrics.com/v1beta1" "monitoring.coreos.com/v1" .Values.metrics.rules.vmRule }}
