@@ -1,0 +1,1 @@
+# proton-secrets-operator
