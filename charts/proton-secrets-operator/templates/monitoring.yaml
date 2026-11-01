@@ -39,10 +39,11 @@ spec:
             severity: warning
           annotations:
             summary: {{ `ProtonSecret {{ $labels.namespace }}/{{ $labels.name }} has not synced for 6h` | quote }}
-        - alert: ProtonPATExpiringSoon
-          expr: protonsecret_pat_expiry_timestamp_seconds > 0 and protonsecret_pat_expiry_timestamp_seconds - time() < {{ mul .Values.metrics.rules.patExpiryDays 86400 }}
+        - alert: ProtonAuthFailing
+          expr: sum(increase(protonsecret_reconcile_total{result="auth"}[30m])) > 0
+          for: 5m
           labels:
             severity: critical
           annotations:
-            summary: The Proton Pass personal access token expires soon; rotate it
+            summary: Proton Pass is rejecting the operator's token; no secrets can sync
 {{- end }}

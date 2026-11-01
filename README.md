@@ -119,12 +119,12 @@ build, package and deploy it. Dependencies only point downwards:
 ## Install
 
 1. Create a **read-only (viewer)** personal access token scoped to a dedicated vault
-   (`pass-cli pat create`). PATs always expire: note the date.
-2. `kubectl -n proton-secrets-system create secret generic proton-pat --from-file=token=<(printf %s "$TOKEN") --from-literal=expires-at=<RFC3339>`
+   (`pass-cli pat create`). PATs expire; when the token stops working the `ProtonAuthFailing` alert fires.
+2. `kubectl -n proton-secrets-system create secret generic proton-pat --from-file=token=<(printf %s "$TOKEN")`
 3. `helm install proton-secrets-operator oci://ghcr.io/chiragsoni81245/charts/proton-secrets-operator -n proton-secrets-system --create-namespace`
 
-The optional `expires-at` key (RFC3339, UTC) feeds the `ProtonPATExpiringSoon` alert; the operator cannot read
-the expiry from Proton. It is re-read every minute, so rotating the Secret needs no restart.
+Rotating the token: update the `proton-pat` Secret. The token file is re-read at every login (about every 100
+minutes), so a restart is only needed to apply it immediately.
 
 ### Changing the pass-cli version
 Set `passCli.image.repository` and `tag` (or `digest`) in the chart values. An initContainer copies

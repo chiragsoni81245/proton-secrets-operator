@@ -168,6 +168,9 @@ func (c *CLI) run(ctx context.Context, extraEnv []string, args ...string) (strin
 func classify(sub, stderr string, err error) error {
 	s := strings.ToLower(stderr)
 	switch {
+	case sub == "login":
+		// Whatever the wording, a failed login means the token was not accepted. Timeouts never get here.
+		return fmt.Errorf("%w: pass-cli login failed", ErrAuth)
 	case strings.Contains(s, "not found"), strings.Contains(s, "no such"), strings.Contains(s, "does not exist"):
 		return fmt.Errorf("%w: pass-cli %s", ErrNotFound, sub)
 	case strings.Contains(s, "unauthor"), strings.Contains(s, "not logged in"),

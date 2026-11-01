@@ -60,9 +60,6 @@ spec:
             {{- else }}
             - --pass-cli-path=/usr/local/bin/pass-cli
             {{- end }}
-            {{- if .Values.pat.expiresAtKey }}
-            - --pat-expiry-file=/var/run/proton/expires-at
-            {{- end }}
             {{- if eq .Values.controller.logLevel "debug" }}
             - --zap-log-level=debug
             {{- end }}
@@ -111,10 +108,6 @@ spec:
             items:
               - key: {{ .Values.pat.key }}
                 path: token
-              {{- if .Values.pat.expiresAtKey }}
-              - key: {{ .Values.pat.expiresAtKey }}
-                path: expires-at
-              {{- end }}
         - name: session
           emptyDir:
             medium: Memory

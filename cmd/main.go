@@ -22,7 +22,6 @@ import (
 	"flag"
 	"net/http"
 	"os"
-	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -75,7 +74,6 @@ func main() {
 	var passCliPath, tokenFile, sessionDir, keyProvider string
 	var maxConcurrent int
 	var protonReadiness bool
-	var patExpiryFile string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -90,8 +88,6 @@ func main() {
 	flag.StringVar(&sessionDir, "session-dir", "/tmp/pass-session",
 		"Writable directory for the pass-cli session (use an emptyDir).")
 	flag.StringVar(&keyProvider, "key-provider", "fs", "pass-cli key provider: fs, env or keyring.")
-	flag.StringVar(&patExpiryFile, "pat-expiry-file", "",
-		"Optional file holding the PAT expiry (RFC3339), re-read every minute and exported as a metric for alerting.")
 	flag.BoolVar(&protonReadiness, "proton-readiness", false,
 		"Make /readyz require a working Proton Pass session (the chart enables this).")
 	flag.IntVar(&maxConcurrent, "max-concurrent-reconciles", 2, "Concurrent reconciles and pass-cli processes.")
@@ -234,19 +230,13 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "protonsecret")
 		os.Exit(1)
 	}
-	if patExpiryFile != "" {
-		if err := mgr.Add(metrics.WatchPATExpiry(patExpiryFile, time.Minute)); err != nil {
-			setupLog.Error(err, "Failed to add PAT expiry watcher")
-			os.Exit(1)
-		}
-	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "Failed to set up health check")
 		os.Exit(1)
 	}
-	// Readiness can reflect a usable Proton session so a bad/expired PAT is visible.
+	// Readiness can reflect a usable Proton session so a bad or expired PAT is visible.
 	if protonReadiness {
 		if err := mgr.AddReadyzCheck("proton", func(r *http.Request) error {
 			return pc.Healthy(r.Context())

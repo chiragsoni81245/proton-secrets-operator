@@ -23,9 +23,6 @@
         "key": {
           "type": "string",
           "minLength": 1
-        },
-        "expiresAtKey": {
-          "type": "string"
         }
       }
     },
