@@ -80,6 +80,9 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 65532
   runAsGroup: 65532
+  # Required: the PAT Secret is mounted 0440 (root-owned); fsGroup gives the volume files this group so
+  # the non-root operator can read the token.
+  fsGroup: 65532
   seccompProfile:
     type: RuntimeDefault
 containerSecurityContext:
