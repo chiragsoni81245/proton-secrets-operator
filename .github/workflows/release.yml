@@ -1,11 +1,18 @@
 name: Release
-# Tag vX.Y.Z -> multi-arch image, pass-cli image, OCI Helm chart, all signed with cosign (keyless).
+# Tag vX.Y.Z  -> multi-arch operator image (:vX.Y.Z), pass-cli image, OCI Helm chart, all signed with cosign (keyless).
+# Push to main/master -> multi-arch operator image only, tagged :latest and :sha-<short>, signed.
 # pass-cli pin comes from repository variables (see hack/pass-cli-versions.md):
 #   PASS_CLI_VERSION, PASS_CLI_URL_AMD64, PASS_CLI_SHA256_AMD64, PASS_CLI_URL_ARM64, PASS_CLI_SHA256_ARM64
 on:
   push:
+    branches:
+      - main
+      - master
     tags:
       - 'v*'
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type == 'branch' }}
 permissions:
   contents: read
   packages: write
@@ -44,6 +51,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Operator image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ github.ref_type == 'branch' }}
+            type=sha,format=short,enable=${{ github.ref_type == 'branch' }}
       - name: Operator image
         id: manager
         uses: docker/build-push-action@v6
@@ -54,7 +72,7 @@ jobs:
           push: true
           provenance: mode=max
           sbom: true
-          tags: ${{ env.IMAGE }}:${{ github.ref_name }}
+          tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             PASS_CLI_VERSION=${{ vars.PASS_CLI_VERSION }}
             PASS_CLI_URL_AMD64=${{ vars.PASS_CLI_URL_AMD64 }}
@@ -63,6 +81,7 @@ jobs:
             PASS_CLI_SHA256_ARM64=${{ vars.PASS_CLI_SHA256_ARM64 }}
       - name: pass-cli image
         id: passcli
+        if: github.ref_type == 'tag'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -78,11 +97,13 @@ jobs:
             PASS_CLI_SHA256_AMD64=${{ vars.PASS_CLI_SHA256_AMD64 }}
             PASS_CLI_URL_ARM64=${{ vars.PASS_CLI_URL_ARM64 }}
             PASS_CLI_SHA256_ARM64=${{ vars.PASS_CLI_SHA256_ARM64 }}
-      - name: Sign images
-        run: |
-          cosign sign --yes ${{ env.IMAGE }}@${{ steps.manager.outputs.digest }}
-          cosign sign --yes ghcr.io/${{ github.repository_owner }}/pass-cli@${{ steps.passcli.outputs.digest }}
+      - name: Sign operator image
+        run: cosign sign --yes ${{ env.IMAGE }}@${{ steps.manager.outputs.digest }}
+      - name: Sign pass-cli image
+        if: github.ref_type == 'tag'
+        run: cosign sign --yes ghcr.io/${{ github.repository_owner }}/pass-cli@${{ steps.passcli.outputs.digest }}
       - name: Package and push chart
+        if: github.ref_type == 'tag'
         run: |
           v="${GITHUB_REF_NAME#v}"
           helm package charts/proton-secrets-operator --version "$v" --app-version "$v"
