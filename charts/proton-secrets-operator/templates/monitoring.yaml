@@ -40,8 +40,8 @@ spec:
           annotations:
             summary: {{ `ProtonSecret {{ $labels.namespace }}/{{ $labels.name }} has not synced for 6h` | quote }}
         - alert: ProtonAuthFailing
-          expr: sum(increase(protonsecret_reconcile_total{result="auth"}[30m])) > 0
-          for: 5m
+          expr: min(protonsecret_auth_ok) == 0
+          for: 10m
           labels:
             severity: critical
           annotations:

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -115,14 +116,11 @@ func (c *CLI) ensureSession(ctx context.Context, force bool) error {
 	}
 	token, err := os.ReadFile(c.cfg.TokenFile)
 	if err != nil {
-		return fmt.Errorf("%w: reading token file: %v", ErrAuth, err)
+		return fmt.Errorf("%w: reading token file: %v", ErrConfig, err)
 	}
 	env := []string{"PROTON_PASS_PERSONAL_ACCESS_TOKEN=" + strings.TrimSpace(string(token))}
 	if _, err := c.run(ctx, env, "login"); err != nil {
-		if errors.Is(err, ErrAuth) || errors.Is(err, ErrTransient) {
-			return err
-		}
-		return fmt.Errorf("%w: %v", ErrAuth, err)
+		return err
 	}
 	c.loggedAt = time.Now()
 	return nil
@@ -155,30 +153,56 @@ func (c *CLI) run(ctx context.Context, extraEnv []string, args ...string) (strin
 		if ctx.Err() != nil {
 			return "", fmt.Errorf("%w: pass-cli %s: %v", ErrTransient, args[0], ctx.Err())
 		}
-		// Only the subcommand and a classification are returned: stderr can
-		// echo references or tokens, so it is never propagated verbatim.
-		return "", classify(args[0], stderr.String(), err)
+		if _, isExit := errors.AsType[*exec.ExitError](err); !isExit {
+			// pass-cli did not run at all (missing binary, permissions): a deployment problem, not bad credentials.
+			return "", fmt.Errorf("%w: cannot run pass-cli: %v", ErrConfig, err)
+		}
+		return "", classify(args[0], sanitize(stderr.String(), extraEnv), err)
 	}
 	return stdout.String(), nil
 }
 
-// classify maps CLI failures to sentinel errors using stderr text. The exact
-// wording is undocumented; unknown failures are treated as transient so they
-// are retried with backoff rather than marked terminal.
+// classify maps CLI failures to sentinel errors using the (already sanitized) stderr text. The exact wording is
+// undocumented, so only clear signals map to ErrAuth/ErrNotFound; anything else is transient and retried with
+// backoff (and still caught by the generic "no successful sync" alert). The sanitized stderr is part of the error so
+// the real reason is visible in the ProtonSecret status and the logs.
 func classify(sub, stderr string, err error) error {
 	s := strings.ToLower(stderr)
-	switch {
-	case sub == "login":
-		// Whatever the wording, a failed login means the token was not accepted. Timeouts never get here.
-		return fmt.Errorf("%w: pass-cli login failed", ErrAuth)
-	case strings.Contains(s, "not found"), strings.Contains(s, "no such"), strings.Contains(s, "does not exist"):
-		return fmt.Errorf("%w: pass-cli %s", ErrNotFound, sub)
-	case strings.Contains(s, "unauthor"), strings.Contains(s, "not logged in"),
-		strings.Contains(s, "session"), strings.Contains(s, "token"), strings.Contains(s, "expired"):
-		return fmt.Errorf("%w: pass-cli %s", ErrAuth, sub)
-	default:
-		return fmt.Errorf("%w: pass-cli %s failed: %v", ErrTransient, sub, err)
+	detail := stderr
+	if detail == "" {
+		detail = err.Error()
 	}
+	switch {
+	case strings.Contains(s, "not found"), strings.Contains(s, "no such"), strings.Contains(s, "does not exist"):
+		return fmt.Errorf("%w: pass-cli %s: %s", ErrNotFound, sub, detail)
+	case strings.Contains(s, "unauthor"), strings.Contains(s, "not logged in"), strings.Contains(s, "invalid token"),
+		strings.Contains(s, "invalid personal access token"), strings.Contains(s, "token expired"),
+		strings.Contains(s, "expired token"), strings.Contains(s, "access token"), strings.Contains(s, "revoked"),
+		strings.Contains(s, "session expired"), strings.Contains(s, "authentication"):
+		return fmt.Errorf("%w: pass-cli %s: %s", ErrAuth, sub, detail)
+	default:
+		return fmt.Errorf("%w: pass-cli %s failed: %s", ErrTransient, sub, detail)
+	}
+}
+
+var tokenLike = regexp.MustCompile(`pst_[A-Za-z0-9_:.\-]+`)
+
+const maxDetail = 200
+
+// sanitize makes stderr safe to show: the token (from extraEnv, and anything shaped like a PAT) is replaced, whitespace
+// is collapsed and the result is truncated.
+func sanitize(stderr string, extraEnv []string) string {
+	for _, kv := range extraEnv {
+		if _, v, ok := strings.Cut(kv, "="); ok && len(v) >= 6 {
+			stderr = strings.ReplaceAll(stderr, v, "***")
+		}
+	}
+	stderr = tokenLike.ReplaceAllString(stderr, "***")
+	stderr = strings.Join(strings.Fields(stderr), " ")
+	if len(stderr) > maxDetail {
+		stderr = stderr[:maxDetail] + "..."
+	}
+	return stderr
 }
 
 // CLIVersion returns the output of `pass-cli --version` (first line) or

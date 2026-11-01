@@ -239,7 +239,9 @@ func main() {
 	// Readiness can reflect a usable Proton session so a bad or expired PAT is visible.
 	if protonReadiness {
 		if err := mgr.AddReadyzCheck("proton", func(r *http.Request) error {
-			return pc.Healthy(r.Context())
+			err := pc.Healthy(r.Context())
+			metrics.RecordAuth(err)
+			return err
 		}); err != nil {
 			setupLog.Error(err, "Failed to set up Proton ready check")
 			os.Exit(1)

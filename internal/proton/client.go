@@ -23,6 +23,9 @@ var (
 	ErrNotFound = errors.New("proton: reference not found")
 	// ErrAuth means login failed or the token is invalid/expired.
 	ErrAuth = errors.New("proton: authentication failed")
+	// ErrConfig means the operator itself is misconfigured: the token file is unreadable or pass-cli cannot run.
+	// It is not an authentication failure, so it must not be reported as one.
+	ErrConfig = errors.New("proton: operator misconfigured")
 	// ErrTransient wraps timeouts and other retryable failures.
 	ErrTransient = errors.New("proton: transient error")
 )

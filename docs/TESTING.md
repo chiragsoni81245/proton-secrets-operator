@@ -63,13 +63,13 @@ Run these scenarios and tick them off:
 - [ ] **Foreign Secret**: pre-create a Secret with the same name; ProtonSecret reports `SecretConflict`, existing data untouched. With `creationPolicy: Merge` it adopts.
 - [ ] **Bad reference**: nonexistent item; Ready=False with reason, no log flooding, retries about every 10 min, not a hot loop.
 - [ ] **Proton unavailable**: disable network or revoke the PAT mid-run; Secrets unchanged, Ready=False, exponential backoff; restore and it recovers on its own.
-- [ ] **Bad token**: start with a wrong or revoked PAT. Ready=False with reason `SyncFailed`, `protonsecret_reconcile_total{result="auth"}` increases (this is what the `ProtonAuthFailing` alert watches), existing Secrets are untouched. If the counter shows `transient` or `error` instead, the login failure is not being classified: send me the log.
+- [ ] **Bad token**: start with a wrong or revoked PAT. Ready=False with reason `SyncFailed`; `protonsecret_auth_ok` drops to 0 and `protonsecret_reconcile_total{result="auth"}` increases (the gauge is what the `ProtonAuthFailing` alert watches; it returns to 1 on the first success). Existing Secrets are untouched. If it counts as `transient` instead, the rejection wording was not recognised: the status condition and logs now contain the (redacted) pass-cli message, send it to me and I will add it to `classify()`.
 - [ ] **Expired session**: leave running > 2h (or `pass-cli logout` the session dir manually); next sync re-logs in transparently.
 - [ ] **Rollout**: set `rolloutTargets` to a test Deployment, change the value; pod template annotation `proton-secrets.io/restartedAt` is bumped and pods restart. Unchanged value: no restart.
 - [ ] **Suspend**: `spec.suspend: true`; changes are ignored until unsuspended.
 - [ ] **Delete**: `deletionPolicy: Delete` removes the Secret; `Retain` keeps it (without owner reference).
 - [ ] **Leak check**: `kubectl get psec -o yaml`, `kubectl describe psec`, operator logs and events contain **no values or token**.
-- [ ] **Metrics**: `curl localhost:8443/metrics | grep protonsecret_`. `protonsecret_reconcile_total{result="auth"}` must increase when you start with a wrong token (see "Bad token" below).
+- [ ] **Metrics**: `curl localhost:8443/metrics | grep protonsecret_`. `protonsecret_auth_ok` is 1 with a good token and 0 with a rejected one (see "Bad token").
 
 ## Stage 3: packaging
 ```bash

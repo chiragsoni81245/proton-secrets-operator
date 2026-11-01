@@ -28,6 +28,11 @@ var (
 		Help: "Unix time of the last successful sync per ProtonSecret.",
 	}, []string{"namespace", "name"})
 
+	AuthOK = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "protonsecret_auth_ok",
+		Help: "1 if the last use of the Proton token succeeded, 0 if Proton rejected it. Unset until the first attempt.",
+	})
+
 	PassCLIInfo = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "protonsecret_passcli_info",
 		Help: "Constant 1, labelled with the pass-cli version in use.",
@@ -35,7 +40,7 @@ var (
 )
 
 func init() {
-	ctrlmetrics.Registry.MustRegister(ReconcileTotal, SyncDuration, LastSync, PassCLIInfo)
+	ctrlmetrics.Registry.MustRegister(ReconcileTotal, SyncDuration, LastSync, AuthOK, PassCLIInfo)
 }
 
 // Result maps a reconcile error to a low-cardinality label.
@@ -49,9 +54,22 @@ func Result(err error, foreign bool) string {
 		return "not_found"
 	case errors.Is(err, proton.ErrAuth):
 		return "auth"
+	case errors.Is(err, proton.ErrConfig):
+		return "config"
 	case errors.Is(err, proton.ErrTransient):
 		return "transient"
 	default:
 		return "error"
+	}
+}
+
+// RecordAuth updates protonsecret_auth_ok from the outcome of an operation that used the token. Only a success
+// (1) or an authentication rejection (0) changes it; transient, not-found and config errors leave it as it was.
+func RecordAuth(err error) {
+	switch {
+	case err == nil:
+		AuthOK.Set(1)
+	case errors.Is(err, proton.ErrAuth):
+		AuthOK.Set(0)
 	}
 }

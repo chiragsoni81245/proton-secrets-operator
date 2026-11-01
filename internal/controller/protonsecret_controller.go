@@ -104,6 +104,7 @@ func (r *ProtonSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	start := time.Now()
 	err := r.sync(ctx, &ps)
 	metrics.SyncDuration.Observe(time.Since(start).Seconds())
+	metrics.RecordAuth(err)
 	metrics.ReconcileTotal.WithLabelValues(metrics.Result(err, errors.Is(err, errForeignSecret))).Inc()
 	if err == nil {
 		metrics.LastSync.WithLabelValues(ps.Namespace, ps.Name).SetToCurrentTime()
