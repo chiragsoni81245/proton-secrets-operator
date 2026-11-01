@@ -29,15 +29,15 @@ const (
 	ConditionSynced = "Synced"
 
 	// ForceSyncAnnotation triggers an immediate reconcile when its value changes.
-	ForceSyncAnnotation = "proton.chiragsoni.org/force-sync"
+	ForceSyncAnnotation = "proton-secrets.io/force-sync"
 	// ManagedByLabel marks Secrets created by this operator.
 	ManagedByLabel = "app.kubernetes.io/managed-by"
 	// ManagedByValue is the value of ManagedByLabel.
 	ManagedByValue = "proton-secrets-operator"
 	// HashAnnotation holds the SHA-256 of the synced data on the target Secret.
-	HashAnnotation = "proton.chiragsoni.org/data-hash"
+	HashAnnotation = "proton-secrets.io/data-hash"
 	// RestartedAtAnnotation is patched into pod templates of rollout targets.
-	RestartedAtAnnotation = "proton.chiragsoni.org/restartedAt"
+	RestartedAtAnnotation = "proton-secrets.io/restartedAt"
 )
 
 // CreationPolicy controls what happens if the target Secret already exists.

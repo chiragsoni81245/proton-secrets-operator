@@ -56,7 +56,7 @@ kubectl apply -n pso-test -f config/samples/proton_v1alpha1_protonsecret.yaml   
 Run these scenarios and tick them off:
 
 - [ ] **Create**: Secret appears, keys correct, `kubectl get psec -n pso-test` shows Ready=True, owner reference is the ProtonSecret, label `app.kubernetes.io/managed-by` set.
-- [ ] **Value changes in Proton**: edit the password in Proton; after `kubectl annotate psec <n> proton.chiragsoni.org/force-sync=$(date +%s) --overwrite` the Secret updates within seconds.
+- [ ] **Value changes in Proton**: edit the password in Proton; after `kubectl annotate psec <n> proton-secrets.io/force-sync=$(date +%s) --overwrite` the Secret updates within seconds.
 - [ ] **Refresh interval**: set `refreshInterval: 1m`, change the value in Proton, wait; Secret follows without annotation.
 - [ ] **Spec change**: add/remove a key; Secret gains/loses it (removed keys disappear).
 - [ ] **Drift**: `kubectl edit secret` / `kubectl delete secret`; operator restores it.
@@ -65,7 +65,7 @@ Run these scenarios and tick them off:
 - [ ] **Proton unavailable**: disable network or revoke the PAT mid-run; Secrets unchanged, Ready=False, exponential backoff; restore and it recovers on its own.
 - [ ] **Bad token**: start with a wrong or revoked PAT. Ready=False with reason `SyncFailed`, `protonsecret_reconcile_total{result="auth"}` increases (this is what the `ProtonAuthFailing` alert watches), existing Secrets are untouched. If the counter shows `transient` or `error` instead, the login failure is not being classified: send me the log.
 - [ ] **Expired session**: leave running > 2h (or `pass-cli logout` the session dir manually); next sync re-logs in transparently.
-- [ ] **Rollout**: set `rolloutTargets` to a test Deployment, change the value; pod template annotation `proton.chiragsoni.org/restartedAt` is bumped and pods restart. Unchanged value: no restart.
+- [ ] **Rollout**: set `rolloutTargets` to a test Deployment, change the value; pod template annotation `proton-secrets.io/restartedAt` is bumped and pods restart. Unchanged value: no restart.
 - [ ] **Suspend**: `spec.suspend: true`; changes are ignored until unsuspended.
 - [ ] **Delete**: `deletionPolicy: Delete` removes the Secret; `Retain` keeps it (without owner reference).
 - [ ] **Leak check**: `kubectl get psec -o yaml`, `kubectl describe psec`, operator logs and events contain **no values or token**.

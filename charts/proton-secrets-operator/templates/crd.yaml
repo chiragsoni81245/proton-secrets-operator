@@ -8,9 +8,9 @@ metadata:
     helm.sh/resource-policy: keep
     {{- end }}
     controller-gen.kubebuilder.io/version: v0.22.0
-  name: protonsecrets.proton.chiragsoni.org
+  name: protonsecrets.proton-secrets.io
 spec:
-  group: proton.chiragsoni.org
+  group: proton-secrets.io
   names:
     kind: ProtonSecret
     listKind: ProtonSecretList

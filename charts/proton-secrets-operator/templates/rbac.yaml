@@ -40,7 +40,7 @@ rules:
       - get
       - patch
   - apiGroups:
-      - proton.chiragsoni.org
+      - proton-secrets.io
     resources:
       - protonsecrets
     verbs:
@@ -50,7 +50,7 @@ rules:
       - update
       - patch
   - apiGroups:
-      - proton.chiragsoni.org
+      - proton-secrets.io
     resources:
       - protonsecrets/status
     verbs:
@@ -58,7 +58,7 @@ rules:
       - update
       - patch
   - apiGroups:
-      - proton.chiragsoni.org
+      - proton-secrets.io
     resources:
       - protonsecrets/finalizers
     verbs:

@@ -191,7 +191,7 @@ func main() {
 				protonv1alpha1.ManagedByLabel: protonv1alpha1.ManagedByValue,
 			})},
 		}},
-		LeaderElectionID: "5f4224b3.chiragsoni.org",
+		LeaderElectionID: "5f4224b3.proton-secrets.io",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly

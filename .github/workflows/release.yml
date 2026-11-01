@@ -42,7 +42,6 @@ jobs:
             echo "::error::Run hack/pass-cli-pin.sh, review the output and set the printed variables (see hack/pass-cli-versions.md)."
             exit 1
           fi
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: sigstore/cosign-installer@v3
       - uses: azure/setup-helm@v4
@@ -73,6 +72,8 @@ jobs:
           provenance: mode=max
           sbom: true
           tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=manager
+          cache-to: type=gha,scope=manager,mode=max
           build-args: |
             PASS_CLI_VERSION=${{ vars.PASS_CLI_VERSION }}
             PASS_CLI_URL_AMD64=${{ vars.PASS_CLI_URL_AMD64 }}
@@ -91,6 +92,8 @@ jobs:
           provenance: mode=max
           sbom: true
           tags: ghcr.io/${{ github.repository_owner }}/pass-cli:${{ vars.PASS_CLI_VERSION }}
+          cache-from: type=gha,scope=pass-cli
+          cache-to: type=gha,scope=pass-cli,mode=max
           build-args: |
             PASS_CLI_VERSION=${{ vars.PASS_CLI_VERSION }}
             PASS_CLI_URL_AMD64=${{ vars.PASS_CLI_URL_AMD64 }}

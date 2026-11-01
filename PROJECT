@@ -3,7 +3,7 @@
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
 cliVersion: 4.16.0
-domain: chiragsoni.org
+domain: proton-secrets.io
 layout:
 - go.kubebuilder.io/v4
 projectName: proton-secrets-operator
@@ -13,8 +13,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: chiragsoni.org
-  group: proton
+  domain: proton-secrets.io
   kind: ProtonSecret
   path: github.com/chiragsoni81245/proton-secrets-operator/api/v1alpha1
   version: v1alpha1

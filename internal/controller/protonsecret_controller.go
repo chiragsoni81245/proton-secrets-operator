@@ -51,7 +51,7 @@ import (
 )
 
 const (
-	finalizer       = "proton.chiragsoni.org/finalizer"
+	finalizer       = "proton-secrets.io/finalizer"
 	fieldOwner      = "proton-secrets-operator"
 	minRefresh      = time.Minute
 	defaultRefresh  = time.Hour
@@ -68,9 +68,9 @@ type ProtonSecretReconciler struct {
 	MaxConcurrent int
 }
 
-// +kubebuilder:rbac:groups=proton.chiragsoni.org,resources=protonsecrets,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=proton.chiragsoni.org,resources=protonsecrets/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=proton.chiragsoni.org,resources=protonsecrets/finalizers,verbs=update
+// +kubebuilder:rbac:groups=proton-secrets.io,resources=protonsecrets,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=proton-secrets.io,resources=protonsecrets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=proton-secrets.io,resources=protonsecrets/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch

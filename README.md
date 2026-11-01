@@ -7,7 +7,7 @@ A Kubernetes operator that syncs secrets from [Proton Pass](https://proton.me/pa
 > Unofficial community project. Not affiliated with or endorsed by Proton AG.
 
 ```yaml
-apiVersion: proton.chiragsoni.org/v1alpha1
+apiVersion: proton-secrets.io/v1alpha1
 kind: ProtonSecret
 metadata:
   name: grafana-admin
@@ -34,7 +34,7 @@ spec:
 ```
 
 A sync is triggered when:
-- the `ProtonSecret` spec changes, or `proton.chiragsoni.org/force-sync` is set to a new value;
+- the `ProtonSecret` spec changes, or `proton-secrets.io/force-sync` is set to a new value;
 - `refreshInterval` elapses (default 1h, minimum 1m, ±10% jitter);
 - someone edits or deletes the target Secret (it is reverted).
 
@@ -60,7 +60,7 @@ build, package and deploy it. Dependencies only point downwards:
 .
 ├── api/v1alpha1/               THE API: what users can write
 │   ├── protonsecret_types.go     ProtonSecret spec/status, validation markers, constants
-│   ├── groupversion_info.go      group proton.chiragsoni.org, version v1alpha1
+│   ├── groupversion_info.go      group proton-secrets.io, version v1alpha1
 │   └── zz_generated.deepcopy.go  generated, do not edit (make generate)
 │
 ├── cmd/main.go                 Entry point: flags, manager setup, wiring (cache, probes, metrics)
