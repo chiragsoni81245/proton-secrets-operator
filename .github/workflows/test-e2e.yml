@@ -1,14 +1,10 @@
 name: E2E Tests
 
-# Runs on its own for pull requests and pushes to other branches. On main/master and v* tags it runs only as part
-# of release.yml (workflow_call), which publishes nothing unless this passes.
+# Required check for pull requests into main (ruleset on main: PR + these checks + up to date, no bypass), so
+# every commit on main has passed it and release.yml does not run it again. workflow_dispatch = run by hand.
 on:
-  push:
-    branches-ignore:
-      - main
-      - master
   pull_request:
-  workflow_call:
+  workflow_dispatch:
 
 permissions: {}
 

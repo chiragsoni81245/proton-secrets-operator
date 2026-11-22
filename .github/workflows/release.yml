@@ -13,36 +13,16 @@ on:
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: ${{ github.ref_type == 'branch' }}
-# Nothing is built or published until every check passes. Write permissions only for the publish job.
+# Commits reach main only through a PR that passed lint, unit, e2e and chart checks (ruleset on main), so this
+# workflow only builds and publishes. Write permissions are granted to the publish job alone.
 permissions:
   contents: read
 env:
   REGISTRY: ghcr.io
   IMAGE: ghcr.io/${{ github.repository }}
 jobs:
-  lint:
-    uses: ./.github/workflows/lint.yml
-    permissions:
-      contents: read
-  test:
-    uses: ./.github/workflows/test.yml
-    permissions:
-      contents: read
-  test-e2e:
-    uses: ./.github/workflows/test-e2e.yml
-    permissions:
-      contents: read
-  chart:
-    uses: ./.github/workflows/chart.yml
-    permissions:
-      contents: read
   release:
     name: Build, sign and publish
-    needs:
-      - lint
-      - test
-      - test-e2e
-      - chart
     runs-on: ubuntu-latest
     permissions:
       contents: read
