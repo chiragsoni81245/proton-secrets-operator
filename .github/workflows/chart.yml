@@ -1,21 +1,10 @@
 name: Chart
-# Runs on its own for pull requests and pushes to other branches. On main/master and v* tags it runs only as part
-# of release.yml (workflow_call), which publishes nothing unless this passes.
+# Required check for pull requests into main (ruleset on main: PR + these checks + up to date, no bypass), so
+# every commit on main has passed it and release.yml does not run it again. workflow_dispatch = run by hand.
+# No path filter: a required check that never reports would block every PR that doesn't touch the chart.
 on:
-  push:
-    branches-ignore:
-      - main
-      - master
-    paths:
-      - 'charts/**'
-      - 'config/crd/**'
-      - 'api/**'
   pull_request:
-    paths:
-      - 'charts/**'
-      - 'config/crd/**'
-      - 'api/**'
-  workflow_call:   # no path filter here: a release always checks the chart
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
