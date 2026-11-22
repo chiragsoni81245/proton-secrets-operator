@@ -1,8 +1,14 @@
 name: Lint
 
+# Runs on its own for pull requests and pushes to other branches. On main/master and v* tags it runs only as part
+# of release.yml (workflow_call), which publishes nothing unless this passes.
 on:
   push:
+    branches-ignore:
+      - main
+      - master
   pull_request:
+  workflow_call:
 
 permissions: {}
 
