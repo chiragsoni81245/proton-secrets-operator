@@ -120,11 +120,27 @@ func (c *CLI) ensureSession(ctx context.Context, force bool) error {
 	}
 	env := []string{"PROTON_PASS_PERSONAL_ACCESS_TOKEN=" + strings.TrimSpace(string(token))}
 	if _, err := c.run(ctx, env, "login"); err != nil {
-		return err
+		if !errors.Is(err, errAlreadyLoggedIn) {
+			return err
+		}
+		// An existing session makes pass-cli refuse to log in: the periodic refresh (sessionMaxAge) or a forced
+		// re-login runs while the old session is still in SessionDir, and the session emptyDir also survives
+		// container restarts while loggedAt does not. Drop it and log in again so the refresh really gets a fresh
+		// session; otherwise every later check would repeat the refused login and fail forever.
+		if _, err := c.run(ctx, nil, "logout", "--force"); err != nil {
+			return err
+		}
+		if _, err := c.run(ctx, env, "login"); err != nil {
+			return err
+		}
 	}
 	c.loggedAt = time.Now()
 	return nil
 }
+
+// errAlreadyLoggedIn: pass-cli refused `login` because a session already exists. Handled inside ensureSession; it
+// wraps ErrTransient so that, should it ever escape, it is retried like any other non-credential failure.
+var errAlreadyLoggedIn = fmt.Errorf("%w: a pass-cli session already exists", ErrTransient)
 
 func (c *CLI) run(ctx context.Context, extraEnv []string, args ...string) (string, error) {
 	select {
@@ -173,6 +189,9 @@ func classify(sub, stderr string, err error) error {
 		detail = err.Error()
 	}
 	switch {
+	case strings.Contains(s, "already authenticated"), strings.Contains(s, "already logged in"):
+		// Not a credential problem: a session exists (checked before "logged in"-style auth wording).
+		return fmt.Errorf("%w: pass-cli %s: %s", errAlreadyLoggedIn, sub, detail)
 	case strings.Contains(s, "not found"), strings.Contains(s, "no such"), strings.Contains(s, "does not exist"):
 		return fmt.Errorf("%w: pass-cli %s: %s", ErrNotFound, sub, detail)
 	case strings.Contains(s, "unauthor"), strings.Contains(s, "not logged in"), strings.Contains(s, "invalid token"),
